@@ -16,6 +16,16 @@ public class Startup
     {
         services.AddControllers();
         services.AddSingleton<DatabaseHelper>();
+
+        services.AddCors(options =>
+       {
+           options.AddDefaultPolicy(builder =>
+           {
+               builder.AllowAnyOrigin()
+                      .AllowAnyMethod()
+                      .AllowAnyHeader();
+           });
+       });
     }
 
 
@@ -26,6 +36,7 @@ public class Startup
             app.UseDeveloperExceptionPage();
         }
 
+        app.UseCors();
         app.UseHttpsRedirection();
         app.UseRouting();
         app.UseAuthorization();
@@ -97,7 +108,7 @@ public class Startup
 
         var articles = databaseHelper.PrintCustomers();
         await context.Response.WriteAsync(articles);
-        Console.WriteLine("New Article: " + newArticle.Title + " " + newArticle.DatePublished + " " + newArticle.Link + " " + newArticle.Type);
+        // Console.WriteLine("New Article: " + newArticle.title + " " + newArticle.datePublished + " " + newArticle.link + " " + newArticle.Type);
     }
 
     public Task DropTables(HttpContext context)
@@ -120,6 +131,7 @@ public class Startup
         databaseHelper.CreateInstitutionsTable();
         databaseHelper.CreateInstitutionsTagsTable();
         databaseHelper.InsertAllInstitutions();
+        // databaseHelper.InsertInstitutionTags();
 
         context.Response.WriteAsync("World Created");
         return Task.CompletedTask;

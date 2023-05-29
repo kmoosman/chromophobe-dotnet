@@ -48,7 +48,7 @@ public class DatabaseHelper
             connection.Open();
 
             var insertCommand = connection.CreateCommand();
-            insertCommand.CommandText = "CREATE TABLE article_authors (article_id INTEGER, author_id INTEGER, FOREIGN KEY (article_id) REFERENCES articles(id), FOREIGN KEY (author_id) REFERENCES authors(id), PRIMARY KEY (article_id, author_id))";
+            insertCommand.CommandText = "CREATE TABLE article_authors (article_id INTEGER, author_id INTEGER, FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE, FOREIGN KEY (author_id) REFERENCES authors(id) ON DELETE CASCADE, PRIMARY KEY (article_id, author_id))";
 
             insertCommand.ExecuteNonQuery();
         }
@@ -113,7 +113,7 @@ public class DatabaseHelper
             connection.Open();
 
             var insertCommand = connection.CreateCommand();
-            insertCommand.CommandText = "CREATE TABLE providers_tags (provider_id INTEGER, tag_id INTEGER, FOREIGN KEY (provider_id) REFERENCES providers(id), FOREIGN KEY (tag_id) REFERENCES tags(id), PRIMARY KEY (provider_id, tag_id))";
+            insertCommand.CommandText = "CREATE TABLE providers_tags (provider_id INTEGER, tag_id INTEGER, FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE, PRIMARY KEY (provider_id, tag_id))";
 
             insertCommand.ExecuteNonQuery();
         }
@@ -126,7 +126,7 @@ public class DatabaseHelper
             connection.Open();
 
             var insertCommand = connection.CreateCommand();
-            insertCommand.CommandText = "CREATE TABLE institutions_tags (institution_id INTEGER, tag_id INTEGER, FOREIGN KEY (institution_id) REFERENCES institutions(id), FOREIGN KEY (tag_id) REFERENCES tags(id), PRIMARY KEY (institution_id, tag_id))";
+            insertCommand.CommandText = "CREATE TABLE institution_tags (institution_id INTEGER, tag_id INTEGER, FOREIGN KEY (institution_id) REFERENCES institutions(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id)ON DELETE CASCADE, PRIMARY KEY (institution_id, tag_id))";
 
             insertCommand.ExecuteNonQuery();
         }
@@ -138,15 +138,17 @@ public class DatabaseHelper
         {
             connection.Open();
             var dropTablesSql = @"
+            PRAGMA foreign_keys = 0;
+               DROP TABLE IF EXISTS providers_tags;
+                DROP TABLE IF EXISTS article_authors;
+                DROP TABLE IF EXISTS institution_tags;
                 DROP TABLE IF EXISTS providers;
                 DROP TABLE IF EXISTS authors;
                 DROP TABLE IF EXISTS institutions;
-                DROP TABLE IF EXISTS article_authors;
                 DROP TABLE IF EXISTS articles;
                 DROP TABLE IF EXISTS resources;
-                DROP TABLE IF EXISTS providers_tags;
-                DROP TABLE IF EXISTS institutions_tags;
-                DROP TABLE IF EXISTS tags;";
+                DROP TABLE IF EXISTS tags;
+                PRAGMA foreign_keys = 1;";
             var dropCommand = connection.CreateCommand();
             dropCommand.CommandText = dropTablesSql;
             dropCommand.ExecuteNonQuery();
@@ -219,7 +221,11 @@ public class DatabaseHelper
         using (var connection = new SqliteConnection(connectionString))
         {
             await connection.OpenAsync();
-            var querySql = "SELECT * FROM institutions;";
+            var querySql = @"SELECT institutions.id, institutions.name, institutions.lab, institutions.address, institutions.city, institutions.state, institutions.country, institutions.postal, institutions.image, institutions.link, GROUP_CONCAT(tags.name) AS tags
+                FROM institutions
+                LEFT JOIN institution_tags ON institutions.id = institution_tags.institution_id
+                LEFT JOIN tags ON institution_tags.tag_id = tags.id
+                GROUP BY institutions.id;";
             var command = connection.CreateCommand();
             command.CommandText = querySql;
 
@@ -227,19 +233,21 @@ public class DatabaseHelper
             {
                 while (await reader.ReadAsync())
                 {
-
+                    var tagsString = reader.IsDBNull(10) ? "" : reader.GetString(10);
+                    var tagsList = new List<string>(tagsString.Split(','));
                     var articleAuthor = new Institution
                     {
-                        Id = reader.GetInt32(0),
-                        Name = reader.GetString(1),
-                        Lab = reader.GetString(2),
-                        Address = reader.GetString(3),
-                        City = reader.GetString(4),
-                        State = reader.GetString(5),
-                        Country = reader.GetString(6),
-                        Postal = reader.GetString(7),
-                        Image = reader.GetString(8),
-                        Link = reader.GetString(9)
+                        id = reader.GetInt32(0),
+                        name = reader.GetString(1),
+                        lab = reader.GetString(2),
+                        address = reader.GetString(3),
+                        city = reader.GetString(4),
+                        state = reader.GetString(5),
+                        country = reader.GetString(6),
+                        postal = reader.GetString(7),
+                        image = reader.GetString(8),
+                        link = reader.GetString(9),
+                        tags = tagsList,
                     };
 
                     institutions.Add(articleAuthor);
@@ -259,46 +267,131 @@ public class DatabaseHelper
         {
             connection.Open();
 
-            var institutionsToInsert = new[]
-      {
-            new Institution { Id = 0, Name = "MD Anderson Cancer Center", Lab = "Msaouel Lab", Address = "1515 Holcombe Blvd", City = "Houston", State = "TX", Country = "United States", Postal = "77030", Image = "MDAnderson.png", Link = "https://www.mdanderson.org/research/" },
-            new Institution { Id = 1, Name = "Brighams and Womens Hospital", Lab = "Henske Lab", Address = "20 Shattuck Street Thorn Building, (Elevator D) Room 826", City = "Boston", State = "MA", Country = "United States", Postal = "02115", Image = "Brigham.png", Link = "https://henskelab.bwh.harvard.edu/" },
-            new Institution { Id = 2, Name = "National Cancer Institute", Lab = "Linehan Lab", Address = "10 Center Dr", City = "Bethesda", State = "MD", Country = "United States", Postal = "20892", Image = "NCI.png", Link = "https://ccr.cancer.gov/staff-directory/w-marston-linehan" },
-            new Institution { Id = 3, Name = "Memorial Sloan Kettering Cancer Center", Lab = "", Address = "1275 York Ave", City = "New York", State = "NY", Country = "United States", Postal = "10065", Image = "sloan.png", Link = "https://ccr.cancer.gov/staff-directory/w-marston-linehan" },
-        
-            // Add other institutions here
-        };
+            var tagsToInsert = new List<string> { "fresh_tissue", "fixed_tissue", "trials" };
 
-            foreach (var institution in institutionsToInsert)
+            try
             {
-                var insertCommand = connection.CreateCommand();
-                insertCommand.CommandText = @"
-            INSERT INTO institutions (id, name, lab, address, city, state, country, postal, image, link)
-            VALUES (@Id, @Name, @Lab, @Address, @City, @State, @Country, @Postal, @Image, @Link)";
+                // Insert tags into the tags table
+                InsertTags(connection, tagsToInsert);
 
-                insertCommand.Parameters.AddWithValue("@Id", institution.Id);
-                insertCommand.Parameters.AddWithValue("@Name", institution.Name);
-                insertCommand.Parameters.AddWithValue("@Lab", institution.Lab);
-                insertCommand.Parameters.AddWithValue("@Address", institution.Address);
-                insertCommand.Parameters.AddWithValue("@City", institution.City);
-                insertCommand.Parameters.AddWithValue("@State", institution.State);
-                insertCommand.Parameters.AddWithValue("@Country", institution.Country);
-                insertCommand.Parameters.AddWithValue("@Postal", institution.Postal);
-                insertCommand.Parameters.AddWithValue("@Image", institution.Image);
-                insertCommand.Parameters.AddWithValue("@Link", institution.Link);
-
-                Console.WriteLine($"SQL Command Text: {insertCommand.CommandText}");
-                Console.WriteLine($"Inserting institution: Id={institution.Id}, Name={institution.Name}, Lab={institution.Lab}, Address={institution.Address}, City={institution.City}, State={institution.State}, Country={institution.Country}, Postal={institution.Postal}, Image={institution.Image}, Link={institution.Link}");
-
-
-
-                insertCommand.ExecuteNonQuery();
-                //print what was inserted 
-                Console.WriteLine($"Inserted {institution.Name}");
-
+                // Insert institutions 
+                InsertInstitutions(connection);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
             }
         }
     }
+
+    private void InsertTags(SqliteConnection connection, List<string> tags)
+    {
+        using (var transaction = connection.BeginTransaction())
+        {
+            try
+            {
+                var insertTagsCommand = connection.CreateCommand();
+                insertTagsCommand.Transaction = transaction;
+
+                foreach (var tag in tags)
+                {
+                    insertTagsCommand.CommandText = @"
+                    INSERT INTO tags (name)
+                    VALUES (@name)";
+                    insertTagsCommand.Parameters.Clear();
+                    insertTagsCommand.Parameters.AddWithValue("@name", tag);
+
+                    Console.WriteLine(tag);
+                    Console.WriteLine($"SQL Command Text: {insertTagsCommand.CommandText}");
+                    insertTagsCommand.ExecuteNonQuery();
+                }
+
+                transaction.Commit(); // Commit the tags transaction
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                transaction.Rollback();
+            }
+        }
+    }
+
+    private void InsertInstitutions(SqliteConnection connection)
+    {
+        var institutionsToInsert = new[]
+        {
+        new Institution { id = 0, name = "MD Anderson Cancer Center", lab = "Msaouel Lab", address = "1515 Holcombe Blvd", city = "Houston", state = "TX", country = "United States", postal = "77030", image = "MDAnderson.png", link = "https://www.mdanderson.org/research/" },
+        new Institution { id = 1, name = "Brighams and Womens Hospital", lab = "Henske Lab", address = "20 Shattuck Street Thorn Building, (Elevator D) Room 826", city = "Boston", state = "MA", country = "United States", postal = "02115", image = "Brigham.png", link = "https://henskelab.bwh.harvard.edu/" },
+        new Institution { id = 2, name = "National Cancer Institute", lab = "Linehan Lab", address = "10 Center Dr", city = "Bethesda", state = "MD", country = "United States", postal = "20892", image = "NCI.png", link = "https://ccr.cancer.gov/staff-directory/w-marston-linehan" },
+        new Institution { id = 3, name = "Memorial Sloan Kettering Cancer Center", lab = "", address = "1275 York Ave", city = "New York", state = "NY", country = "United States", postal = "10065", image = "sloan.png", link = "https://ccr.cancer.gov/staff-directory/w-marston-linehan" },
+    };
+
+        foreach (var institution in institutionsToInsert)
+        {
+            var insertCommand = connection.CreateCommand();
+            insertCommand.CommandText = @"
+            INSERT INTO institutions (id, name, lab, address, city, state, country, postal, image, link)
+            VALUES (@id, @name, @lab, @address, @city, @state, @country, @postal, @image, @link)";
+
+            insertCommand.Parameters.AddWithValue("@id", institution.id);
+            insertCommand.Parameters.AddWithValue("@name", institution.name);
+            insertCommand.Parameters.AddWithValue("@lab", institution.lab);
+            insertCommand.Parameters.AddWithValue("@address", institution.address);
+            insertCommand.Parameters.AddWithValue("@city", institution.city);
+            insertCommand.Parameters.AddWithValue("@state", institution.state);
+            insertCommand.Parameters.AddWithValue("@country", institution.country);
+            insertCommand.Parameters.AddWithValue("@postal", institution.postal);
+            insertCommand.Parameters.AddWithValue("@image", institution.image);
+            insertCommand.Parameters.AddWithValue("@link", institution.link);
+
+            Console.WriteLine($"SQL Command Text: {insertCommand.CommandText}");
+            insertCommand.ExecuteNonQuery();
+        }
+    }
+
+
+    //this needs to be revised, ending up with foreign key mismatches
+    // public void InsertInstitutionTags()
+    // {
+    //     using (var connection = new SqliteConnection(connectionString))
+    //     {
+    //         connection.Open();
+
+    //         var institutionTagsToInsert = new[]
+    //         {
+    //         new { InstitutionId = 0, TagId = 1 },
+    //         // new { InstitutionId = 0, TagId = 2 },
+    //         // new { InstitutionId = 0, TagId = 3 },
+    //         // new { InstitutionId = 1, TagId = 1 }
+    //     };
+
+    //         using (var transaction = connection.BeginTransaction())
+    //         {
+    //             try
+    //             {
+    //                 foreach (var institutionTag in institutionTagsToInsert)
+    //                 {
+    //                     var insertCommand = connection.CreateCommand();
+    //                     insertCommand.Transaction = transaction;
+    //                     insertCommand.CommandText = @"
+    //                     INSERT INTO institution_tags (institution_id, tag_id)
+    //                     VALUES (@institutionId, @tagId)";
+    //                     insertCommand.Parameters.AddWithValue("@institutionId", institutionTag.InstitutionId);
+    //                     insertCommand.Parameters.AddWithValue("@tagId", institutionTag.TagId);
+    //                     insertCommand.ExecuteNonQuery();
+    //                 }
+
+    //                 transaction.Commit();
+    //                 Console.WriteLine("Institution tags inserted successfully.");
+    //             }
+    //             catch (Exception ex)
+    //             {
+    //                 Console.WriteLine($"Error: {ex.Message}");
+    //                 transaction.Rollback();
+    //             }
+    //         }
+    //     }
+    // }
 
 
 
@@ -326,10 +419,10 @@ public class DatabaseHelper
 
             var insertCommand = connection.CreateCommand();
             insertCommand.CommandText = "INSERT INTO articles (title, date_published, link, type) VALUES (@title, @date_published, @link, @type)";
-            insertCommand.Parameters.AddWithValue("@title", article.Title);
-            insertCommand.Parameters.AddWithValue("@date_published", article.DatePublished);
-            insertCommand.Parameters.AddWithValue("@link", article.Link);
-            insertCommand.Parameters.AddWithValue("@type", article.Type);
+            insertCommand.Parameters.AddWithValue("@title", article.title);
+            insertCommand.Parameters.AddWithValue("@date_published", article.datePublished);
+            insertCommand.Parameters.AddWithValue("@link", article.link);
+            insertCommand.Parameters.AddWithValue("@type", article.type);
 
             insertCommand.ExecuteNonQuery();
         }
@@ -370,10 +463,10 @@ public class DatabaseHelper
 
                     Article article = new Article
                     {
-                        Title = title,
-                        DatePublished = datePublished,
-                        Link = link,
-                        Type = type
+                        title = title,
+                        datePublished = datePublished,
+                        link = link,
+                        type = type
                     };
 
                     articles.Add(article);

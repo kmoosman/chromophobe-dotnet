@@ -4,17 +4,17 @@ namespace Chromophobe.Models
 {
     public class Article
     {
-        public int Id { get; set; }
+        public int id { get; set; }
 
         [Required]
-        public string Title { get; set; } = string.Empty;
+        public string title { get; set; } = string.Empty;
 
-        public DateTime DatePublished { get; set; }
+        public DateTime datePublished { get; set; }
 
 
-        public string? Link { get; set; }
+        public string? link { get; set; }
 
-        public string Type { get; set; } = string.Empty;
+        public string type { get; set; } = string.Empty;
     }
 }
 

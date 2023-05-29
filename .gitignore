@@ -1,0 +1,28 @@
+# Binaries and Object files
+bin/
+obj/
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio cache files
+*.cache
+*.vcxproj.*
+
+# Packages Directory
+packages/
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+
+# Ignore .NET NuGet packages
+*.nupkg
+
+# Other ignored files
+*.log
+*.bak

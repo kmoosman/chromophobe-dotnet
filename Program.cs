@@ -6,6 +6,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.ComponentModel;
 using System.IO;
+using Chromophobe.Helpers;
+
 public class Startup
 {
     public Startup()
@@ -47,6 +49,7 @@ public class Startup
             endpoints.MapPost("/articles", CreateArticle);
             endpoints.MapGet("/articleAuthors", GetArticleAuthors);
             endpoints.MapGet("/institutions", GetAllInstitutions);
+            endpoints.MapGet("/providers", GetAllProviders);
             endpoints.MapPost("/drop", DropTables);
             endpoints.MapPost("/createWorld", CreateWorld);
 
@@ -59,11 +62,20 @@ public class Startup
         DatabaseHelper databaseHelper = new DatabaseHelper();
         var institutions = await databaseHelper.GetInstitutions();
 
-        // assuming institutions is a List<Institution> or similar collection type
-        var json = JsonSerializer.Serialize(institutions);
+        var json = JsonHelper.SerializeWithCamelCase(institutions);
 
         await context.Response.WriteAsync(json);
-        Console.WriteLine("Institutions: " + json);
+    }
+
+
+    public async Task GetAllProviders(HttpContext context)
+    {
+        DatabaseHelper databaseHelper = new DatabaseHelper();
+        var providers = await databaseHelper.GetProviders();
+
+        var json = JsonHelper.SerializeWithCamelCase(providers);
+
+        await context.Response.WriteAsync(json);
     }
 
 
@@ -72,7 +84,6 @@ public class Startup
         DatabaseHelper databaseHelper = new DatabaseHelper();
         var articles = databaseHelper.PrintCustomers();
         await context.Response.WriteAsync(articles);
-        Console.WriteLine("Articles: " + articles);
     }
 
     public async Task GetArticleAuthors(HttpContext context)
@@ -132,6 +143,7 @@ public class Startup
         databaseHelper.CreateInstitutionsTagsTable();
         databaseHelper.InsertAllInstitutions();
         // databaseHelper.InsertInstitutionTags();
+        databaseHelper.InsertAllProviders();
 
         context.Response.WriteAsync("World Created");
         return Task.CompletedTask;
@@ -155,3 +167,4 @@ public class Program
         app.Run();
     }
 }
+

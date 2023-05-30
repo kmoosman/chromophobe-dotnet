@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Globalization;
 
+
 public class DatabaseHelper
 {
     string connectionString = "Data Source=ChromophobeDatabase.db";
@@ -113,7 +114,7 @@ public class DatabaseHelper
             connection.Open();
 
             var insertCommand = connection.CreateCommand();
-            insertCommand.CommandText = "CREATE TABLE providers_tags (provider_id INTEGER, tag_id INTEGER, FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE, PRIMARY KEY (provider_id, tag_id))";
+            insertCommand.CommandText = "CREATE TABLE provider_tags (provider_id INTEGER, tag_id INTEGER, FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE, PRIMARY KEY (provider_id, tag_id))";
 
             insertCommand.ExecuteNonQuery();
         }
@@ -139,9 +140,9 @@ public class DatabaseHelper
             connection.Open();
             var dropTablesSql = @"
             PRAGMA foreign_keys = 0;
-               DROP TABLE IF EXISTS providers_tags;
                 DROP TABLE IF EXISTS article_authors;
                 DROP TABLE IF EXISTS institution_tags;
+                DROP TABLE IF EXISTS provider_tags;
                 DROP TABLE IF EXISTS providers;
                 DROP TABLE IF EXISTS authors;
                 DROP TABLE IF EXISTS institutions;
@@ -233,24 +234,24 @@ public class DatabaseHelper
             {
                 while (await reader.ReadAsync())
                 {
-                    var tagsString = reader.IsDBNull(10) ? "" : reader.GetString(10);
-                    var tagsList = new List<string>(tagsString.Split(','));
-                    var articleAuthor = new Institution
+                    var tagsString = reader.IsDBNull(10) ? null : reader.GetString(10);
+                    var tagsList = string.IsNullOrEmpty(tagsString) ? new List<string>() : new List<string>(tagsString.Split(','));
+                    var institution = new Institution
                     {
-                        id = reader.GetInt32(0),
-                        name = reader.GetString(1),
-                        lab = reader.GetString(2),
-                        address = reader.GetString(3),
-                        city = reader.GetString(4),
-                        state = reader.GetString(5),
-                        country = reader.GetString(6),
-                        postal = reader.GetString(7),
-                        image = reader.GetString(8),
-                        link = reader.GetString(9),
-                        tags = tagsList,
+                        Id = reader.GetInt32(0),
+                        Name = reader.GetString(1),
+                        Lab = reader.GetString(2),
+                        Address = reader.GetString(3),
+                        City = reader.GetString(4),
+                        State = reader.GetString(5),
+                        Country = reader.GetString(6),
+                        Postal = reader.GetString(7),
+                        Image = reader.GetString(8),
+                        Link = reader.GetString(9),
+                        Tags = tagsList,
                     };
 
-                    institutions.Add(articleAuthor);
+                    institutions.Add(institution);
                 }
             }
         }
@@ -259,6 +260,73 @@ public class DatabaseHelper
     }
 
 
+    public async Task<List<Provider>> GetProviders()
+    {
+        List<Provider> providers = new List<Provider>();
+
+        using (var connection = new SqliteConnection(connectionString))
+        {
+            await connection.OpenAsync();
+            var querySql = @"SELECT providers.id, providers.first_name, providers.last_name, providers.designation, providers.institution, providers.address, providers.city, providers.state, providers.country, providers.postal, providers.image, providers.link, GROUP_CONCAT(tags.name) AS tags
+                FROM providers
+                LEFT JOIN provider_tags ON providers.id = provider_tags.provider_id
+                LEFT JOIN tags ON provider_tags.tag_id = tags.id
+                GROUP BY providers.id;";
+            var command = connection.CreateCommand();
+            command.CommandText = querySql;
+
+            using (var reader = await command.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+
+                    var tagsString = reader.IsDBNull(12) ? null : reader.GetString(12);
+                    var tagsList = string.IsNullOrEmpty(tagsString) ? new List<string>() : new List<string>(tagsString.Split(','));
+                    var provider = new Provider
+                    {
+                        Id = reader.GetInt32(0),
+                        FirstName = reader.GetString(1),
+                        LastName = reader.GetString(2),
+                        Designation = reader.GetString(3),
+                        Institution = reader.GetString(4),
+                        Address = reader.GetString(5),
+                        City = reader.GetString(6),
+                        State = reader.GetString(7),
+                        Country = reader.GetString(8),
+                        Postal = reader.GetString(9),
+                        Image = reader.GetString(10),
+                        Link = reader.GetString(11),
+                        Tags = tagsList,
+
+                    };
+
+                    providers.Add(provider);
+                }
+            }
+        }
+
+        return providers;
+    }
+
+    public void InsertAllProviders()
+    {
+        using (var connection = new SqliteConnection(connectionString))
+        {
+            connection.Open();
+
+            try
+            {
+                // Insert institutions 
+                InsertProviders(connection);
+
+                // todo: Insert tags into the tags table
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+            }
+        }
+    }
 
 
     public void InsertAllInstitutions()
@@ -266,8 +334,7 @@ public class DatabaseHelper
         using (var connection = new SqliteConnection(connectionString))
         {
             connection.Open();
-
-            var tagsToInsert = new List<string> { "fresh_tissue", "fixed_tissue", "trials" };
+            var tagsToInsert = new List<string> { "fresh_tissue", "fixed_tissue", "trials", "rcc_specialist", "physician_scientist", "research" };
 
             try
             {
@@ -320,10 +387,10 @@ public class DatabaseHelper
     {
         var institutionsToInsert = new[]
         {
-        new Institution { id = 0, name = "MD Anderson Cancer Center", lab = "Msaouel Lab", address = "1515 Holcombe Blvd", city = "Houston", state = "TX", country = "United States", postal = "77030", image = "MDAnderson.png", link = "https://www.mdanderson.org/research/" },
-        new Institution { id = 1, name = "Brighams and Womens Hospital", lab = "Henske Lab", address = "20 Shattuck Street Thorn Building, (Elevator D) Room 826", city = "Boston", state = "MA", country = "United States", postal = "02115", image = "Brigham.png", link = "https://henskelab.bwh.harvard.edu/" },
-        new Institution { id = 2, name = "National Cancer Institute", lab = "Linehan Lab", address = "10 Center Dr", city = "Bethesda", state = "MD", country = "United States", postal = "20892", image = "NCI.png", link = "https://ccr.cancer.gov/staff-directory/w-marston-linehan" },
-        new Institution { id = 3, name = "Memorial Sloan Kettering Cancer Center", lab = "", address = "1275 York Ave", city = "New York", state = "NY", country = "United States", postal = "10065", image = "sloan.png", link = "https://ccr.cancer.gov/staff-directory/w-marston-linehan" },
+            new Institution { Id = 1, Name = "MD Anderson Cancer Center", Lab = "Msaouel Lab", Address = "1515 Holcombe Blvd", City = "Houston", State = "TX", Country = "United States", Postal = "77030", Image = "MDAnderson.png", Link = "https://www.mdanderson.org/research/" },
+            new Institution { Id = 2, Name = "Brighams and Womens Hospital", Lab = "Henske Lab", Address = "20 Shattuck Street Thorn Building, (Elevator D) Room 826", City = "Boston", State = "MA", Country = "United States", Postal = "02115", Image = "Brigham.png", Link = "https://henskelab.bwh.harvard.edu/" },
+            new Institution { Id = 3, Name = "National Cancer Institute", Lab = "Linehan Lab", Address = "10 Center Dr", City = "Bethesda", State = "MD", Country = "United States", Postal = "20892", Image = "NCI.png", Link = "https://ccr.cancer.gov/staff-directory/w-marston-linehan" },
+            new Institution { Id = 4, Name = "Memorial Sloan Kettering Cancer Center", Lab = "", Address = "1275 York Ave", City = "New York", State = "NY", Country = "United States", Postal = "10065", Image = "sloan.png", Link = "https://ccr.cancer.gov/staff-directory/w-marston-linehan" }
     };
 
         foreach (var institution in institutionsToInsert)
@@ -333,21 +400,60 @@ public class DatabaseHelper
             INSERT INTO institutions (id, name, lab, address, city, state, country, postal, image, link)
             VALUES (@id, @name, @lab, @address, @city, @state, @country, @postal, @image, @link)";
 
-            insertCommand.Parameters.AddWithValue("@id", institution.id);
-            insertCommand.Parameters.AddWithValue("@name", institution.name);
-            insertCommand.Parameters.AddWithValue("@lab", institution.lab);
-            insertCommand.Parameters.AddWithValue("@address", institution.address);
-            insertCommand.Parameters.AddWithValue("@city", institution.city);
-            insertCommand.Parameters.AddWithValue("@state", institution.state);
-            insertCommand.Parameters.AddWithValue("@country", institution.country);
-            insertCommand.Parameters.AddWithValue("@postal", institution.postal);
-            insertCommand.Parameters.AddWithValue("@image", institution.image);
-            insertCommand.Parameters.AddWithValue("@link", institution.link);
-
+            insertCommand.Parameters.AddWithValue("@id", institution.Id);
+            insertCommand.Parameters.AddWithValue("@name", institution.Name);
+            insertCommand.Parameters.AddWithValue("@lab", institution.Lab);
+            insertCommand.Parameters.AddWithValue("@address", institution.Address);
+            insertCommand.Parameters.AddWithValue("@city", institution.City);
+            insertCommand.Parameters.AddWithValue("@state", institution.State);
+            insertCommand.Parameters.AddWithValue("@country", institution.Country);
+            insertCommand.Parameters.AddWithValue("@postal", institution.Postal);
+            insertCommand.Parameters.AddWithValue("@image", institution.Image);
+            insertCommand.Parameters.AddWithValue("@link", institution.Link);
             Console.WriteLine($"SQL Command Text: {insertCommand.CommandText}");
             insertCommand.ExecuteNonQuery();
         }
     }
+
+    private void InsertProviders(SqliteConnection connection)
+    {
+        var providersToInsert = new List<Provider>
+        {
+        new Provider { Id = 1, FirstName = "Pavlos", LastName = "Msaouel", Designation = "MD PhD", Institution = "MD Anderson Cancer Center", Address = "1515 Holcombe Blvd", City = "Houston", State = "TX", Country = "United States", Postal = "77030", Image = "msaouel.png", Link = "https://faculty.mdanderson.org/profiles/pavlos_msaouel.html"},
+        new Provider { Id = 2, FirstName = "Andrew", LastName = "Hahn", Designation = "MD", Institution = "MD Anderson Cancer Center", Address = "1515 Holcombe Blvd", City = "Houston", State = "TX", Country = "United States", Postal = "77030", Image = "andrewHahn.png", Link = "https://faculty.mdanderson.org/profiles/andrew_hahn.html"},
+        new Provider { Id = 3, FirstName = "Nizar", LastName = "Tannir", Designation = "MD", Institution = "MD Anderson Cancer Center", Address = "1515 Holcombe Blvd", City = "Houston", State = "TX", Country = "United States", Postal = "77030", Image = "tannir.png", Link = "https://faculty.mdanderson.org/profiles/nizar_tannir.html"},
+        new Provider { Id = 4, FirstName = "Martin", LastName = "Voss", Designation = "MD", Institution = "Memorial Sloan Kettering Cancer Center", Address = "1275 York Ave", City = "New York", State = "NY", Country = "United States", Postal = "10065", Image = "voss.png", Link = "https://www.mskcc.org/cancer-care/doctors/martin-voss" },
+        new Provider { Id = 5, FirstName = "Lisa", LastName = "Henske", Designation = "MD PhD", Institution = "Dana Farber Cancer Institute", Address = "450 Brookline Ave", City = "Boston", State = "NY", Country = "United States", Postal = "10065", Image = "henske.png", Link = "https://www.dana-farber.org/find-a-doctor/elizabeth-p-henske/" },
+        new Provider { Id = 6, FirstName = "Sumanta Kumar", LastName = "Pal", Designation = "MD", Institution = "City of Hope", Address = "1500 E Duarte Rd", City = "Duarte", State = "CA", Country = "United States", Postal = "91010", Image = "monty.png", Link = "https://www.dana-farber.org/find-a-doctor/elizabeth-p-henske/" },
+        new Provider { Id = 7, FirstName = "Tian", LastName = "Zhang", Designation = "MD", Institution = "UT Southwestern", Address = "5323 Harry Hines Blvd", City = "Dallas", State = "TX", Country = "United States", Postal = "75390", Image = "zhang.png", Link = "https://utswmed.org/doctors/tian-zhang/" }
+        };
+
+        foreach (var provider in providersToInsert)
+        {
+            var insertCommand = connection.CreateCommand();
+            insertCommand.CommandText = @"
+            INSERT INTO providers (id, first_name, last_name, designation, institution, address, city, state, country, postal, image, link)
+            VALUES (@id, @firstName, @lastName, @designation, @institution, @address, @city, @state, @country, @postal, @image, @link)";
+
+            insertCommand.Parameters.AddWithValue("@id", provider.Id);
+            insertCommand.Parameters.AddWithValue("@firstName", provider.FirstName);
+            insertCommand.Parameters.AddWithValue("@lastName", provider.LastName);
+            insertCommand.Parameters.AddWithValue("@designation", provider.Designation);
+            insertCommand.Parameters.AddWithValue("@institution", provider.Institution);
+            insertCommand.Parameters.AddWithValue("@address", provider.Address);
+            insertCommand.Parameters.AddWithValue("@city", provider.City);
+            insertCommand.Parameters.AddWithValue("@state", provider.State);
+            insertCommand.Parameters.AddWithValue("@country", provider.Country);
+            insertCommand.Parameters.AddWithValue("@postal", provider.Postal);
+            insertCommand.Parameters.AddWithValue("@image", provider.Image);
+            insertCommand.Parameters.AddWithValue("@link", provider.Link);
+
+            Console.WriteLine($"SQL Command Text: {insertCommand.CommandText}");
+            insertCommand.ExecuteNonQuery();
+        }
+
+    }
+
 
 
     //this needs to be revised, ending up with foreign key mismatches
@@ -392,23 +498,6 @@ public class DatabaseHelper
     //         }
     //     }
     // }
-
-
-
-    public void InsertCustomer(string firstName, string lastName)
-    {
-        using (var connection = new SqliteConnection(connectionString))
-        {
-            connection.Open();
-
-            var insertCommand = connection.CreateCommand();
-            insertCommand.CommandText = "INSERT INTO Customers (FirstName, LastName) VALUES (@FirstName, @LastName)";
-            insertCommand.Parameters.AddWithValue("@FirstName", firstName);
-            insertCommand.Parameters.AddWithValue("@LastName", lastName);
-
-            insertCommand.ExecuteNonQuery();
-        }
-    }
 
 
     public void InsertArticle(Article article)
@@ -482,7 +571,7 @@ public class DatabaseHelper
 
 public class CustomDateTimeConverter : JsonConverter<DateTime>
 {
-    private const string DateFormat = "yyyy-MM-dd";
+    private const string DateFormat = "yy-MM-dd";
 
     public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {

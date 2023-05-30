@@ -421,11 +421,8 @@ public class DatabaseHelper
         {
         new Provider { Id = 1, FirstName = "Pavlos", LastName = "Msaouel", Designation = "MD PhD", Institution = "MD Anderson Cancer Center", Address = "1515 Holcombe Blvd", City = "Houston", State = "TX", Country = "United States", Postal = "77030", Image = "msaouel.png", Link = "https://faculty.mdanderson.org/profiles/pavlos_msaouel.html"},
         new Provider { Id = 2, FirstName = "Andrew", LastName = "Hahn", Designation = "MD", Institution = "MD Anderson Cancer Center", Address = "1515 Holcombe Blvd", City = "Houston", State = "TX", Country = "United States", Postal = "77030", Image = "andrewHahn.png", Link = "https://faculty.mdanderson.org/profiles/andrew_hahn.html"},
-        new Provider { Id = 3, FirstName = "Nizar", LastName = "Tannir", Designation = "MD", Institution = "MD Anderson Cancer Center", Address = "1515 Holcombe Blvd", City = "Houston", State = "TX", Country = "United States", Postal = "77030", Image = "tannir.png", Link = "https://faculty.mdanderson.org/profiles/nizar_tannir.html"},
         new Provider { Id = 4, FirstName = "Martin", LastName = "Voss", Designation = "MD", Institution = "Memorial Sloan Kettering Cancer Center", Address = "1275 York Ave", City = "New York", State = "NY", Country = "United States", Postal = "10065", Image = "voss.png", Link = "https://www.mskcc.org/cancer-care/doctors/martin-voss" },
         new Provider { Id = 5, FirstName = "Lisa", LastName = "Henske", Designation = "MD PhD", Institution = "Dana Farber Cancer Institute", Address = "450 Brookline Ave", City = "Boston", State = "NY", Country = "United States", Postal = "10065", Image = "henske.png", Link = "https://www.dana-farber.org/find-a-doctor/elizabeth-p-henske/" },
-        new Provider { Id = 6, FirstName = "Sumanta Kumar", LastName = "Pal", Designation = "MD", Institution = "City of Hope", Address = "1500 E Duarte Rd", City = "Duarte", State = "CA", Country = "United States", Postal = "91010", Image = "monty.png", Link = "https://www.dana-farber.org/find-a-doctor/elizabeth-p-henske/" },
-        new Provider { Id = 7, FirstName = "Tian", LastName = "Zhang", Designation = "MD", Institution = "UT Southwestern", Address = "5323 Harry Hines Blvd", City = "Dallas", State = "TX", Country = "United States", Postal = "75390", Image = "zhang.png", Link = "https://utswmed.org/doctors/tian-zhang/" }
         };
 
         foreach (var provider in providersToInsert)
@@ -571,7 +568,7 @@ public class DatabaseHelper
 
 public class CustomDateTimeConverter : JsonConverter<DateTime>
 {
-    private const string DateFormat = "yy-MM-dd";
+    private const string DateFormat = "yyyy-MM-dd";
 
     public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
